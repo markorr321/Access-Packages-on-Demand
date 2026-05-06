@@ -37,7 +37,58 @@ function Save-AccessPackageConfig {
     param([array]$Packages)
     $dir = Split-Path $script:ConfigPath -Parent
     if (-not (Test-Path $dir)) { New-Item -Path $dir -ItemType Directory -Force | Out-Null }
-    @{ Packages = $Packages } | ConvertTo-Json -Depth 10 | Set-Content $script:ConfigPath -Force
+    # Preserve any existing AppRegistration block
+    $existing = @{}
+    if (Test-Path $script:ConfigPath) {
+        try { $existing = Get-Content $script:ConfigPath -Raw | ConvertFrom-Json -AsHashtable } catch { }
+    }
+    $cfg = @{ Packages = $Packages }
+    if ($existing.AppRegistration) { $cfg['AppRegistration'] = $existing.AppRegistration }
+    $cfg | ConvertTo-Json -Depth 10 | Set-Content $script:ConfigPath -Force
+}
+
+function Get-AppRegistrationConfig {
+    [CmdletBinding()]
+    param()
+    if (-not (Test-Path $script:ConfigPath)) { return $null }
+    try {
+        $cfg = Get-Content $script:ConfigPath -Raw | ConvertFrom-Json
+        if ($cfg.AppRegistration -and $cfg.AppRegistration.ClientId) { return $cfg.AppRegistration }
+    } catch { }
+    return $null
+}
+
+function Save-AppRegistrationConfig {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$ClientId,
+        [string]$TenantId
+    )
+    $dir = Split-Path $script:ConfigPath -Parent
+    if (-not (Test-Path $dir)) { New-Item -Path $dir -ItemType Directory -Force | Out-Null }
+    $existing = @{}
+    if (Test-Path $script:ConfigPath) {
+        try { $existing = Get-Content $script:ConfigPath -Raw | ConvertFrom-Json -AsHashtable } catch { }
+    }
+    $existing['AppRegistration'] = @{ ClientId = $ClientId; TenantId = $TenantId }
+    $existing | ConvertTo-Json -Depth 10 | Set-Content $script:ConfigPath -Force
+}
+
+function Clear-AppRegistrationConfig {
+    [CmdletBinding()]
+    param()
+    if (-not (Test-Path $script:ConfigPath)) {
+        Write-Host "No configuration file found." -ForegroundColor Yellow
+        return
+    }
+    try {
+        $existing = Get-Content $script:ConfigPath -Raw | ConvertFrom-Json -AsHashtable
+        $existing.Remove('AppRegistration')
+        $existing | ConvertTo-Json -Depth 10 | Set-Content $script:ConfigPath -Force
+        Write-Host "App registration cleared." -ForegroundColor Green
+    } catch {
+        Write-Host "Failed to clear app registration: $($_.Exception.Message)" -ForegroundColor Red
+    }
 }
 
 function Clear-AccessPackageConfig {
@@ -72,15 +123,26 @@ function Set-AccessPackageConfig {
             Write-Host "  ${ESC}[33mNo packages configured yet.${ESC}[0m"
             Write-Host ""
         }
+        # Show app registration status
+        $appReg = Get-AppRegistrationConfig
+        if ($appReg) {
+            Write-Host "  ${ESC}[1;97mApp Registration:${ESC}[0m"
+            Write-Host "    ${ESC}[90m·${ESC}[0m Client ID  ${ESC}[90m$($appReg.ClientId)${ESC}[0m"
+            if ($appReg.TenantId) {
+                Write-Host "    ${ESC}[90m·${ESC}[0m Tenant ID  ${ESC}[90m$($appReg.TenantId)${ESC}[0m"
+            }
+            Write-Host ""
+        }
         Write-Host "  ${ESC}[1;97mOptions${ESC}[0m"
         Write-Host "    ${ESC}[36m1${ESC}[0m  Add a package"
         Write-Host "    ${ESC}[36m2${ESC}[0m  Remove a package"
         Write-Host "    ${ESC}[36m3${ESC}[0m  Replace all (start fresh)"
-        Write-Host "    ${ESC}[36m4${ESC}[0m  Done"
+        Write-Host "    ${ESC}[36m4${ESC}[0m  Configure app registration"
+        Write-Host "    ${ESC}[36m5${ESC}[0m  Done"
         Write-Host ""
-        $choice = (Read-Host '  Select option (1-4)').Trim()
-        if ($choice -notmatch '^[1-4]$') { continue }
-        if ($choice -eq '4') { return }
+        $choice = (Read-Host '  Select option (1-5)').Trim()
+        if ($choice -notmatch '^[1-5]$') { continue }
+        if ($choice -eq '5') { return }
 
         switch ($choice) {
             '1' {
@@ -130,6 +192,29 @@ function Set-AccessPackageConfig {
                     Write-Host "  ${ESC}[32mSaved $($new.Count) package(s).${ESC}[0m"
                 }
                 Start-Sleep -Milliseconds 600
+            }
+            '4' {
+                Write-Host ""
+                Write-Host "  ${ESC}[1;97mConfigure App Registration${ESC}[0m"
+                Write-Host "  ${ESC}[90m──────────────────────────${ESC}[0m"
+                Write-Host ""
+                Write-Host "  ${ESC}[90mLeave blank and press Enter to clear the saved app registration.${ESC}[0m"
+                Write-Host ""
+                $cid = (Read-Host '  Client ID (GUID)').Trim()
+                if ([string]::IsNullOrWhiteSpace($cid)) {
+                    Clear-AppRegistrationConfig
+                    Start-Sleep -Milliseconds 600
+                    continue
+                }
+                try { $null = [System.Guid]::Parse($cid) }
+                catch { Write-Host "  ${ESC}[31mInvalid GUID format.${ESC}[0m"; Start-Sleep -Milliseconds 800; continue }
+                $tid = (Read-Host '  Tenant ID (GUID, optional)').Trim()
+                if ($tid -and -not ([string]::IsNullOrWhiteSpace($tid))) {
+                    try { $null = [System.Guid]::Parse($tid) }
+                    catch { Write-Host "  ${ESC}[31mInvalid Tenant ID GUID.${ESC}[0m"; Start-Sleep -Milliseconds 800; continue }
+                } else { $tid = '' }
+                Save-AppRegistrationConfig -ClientId $cid -TenantId $tid
+                Write-Host "  ${ESC}[32mApp registration saved.${ESC}[0m"; Start-Sleep -Milliseconds 600
             }
         }
     }
@@ -256,10 +341,31 @@ function Connect-GraphSession {
         'User.Read.All'
     )
     try {
+        $appReg = Get-AppRegistrationConfig
         $ctx = Get-MgContext -ErrorAction SilentlyContinue
-        $hasAll = $ctx -and -not ($scopes | Where-Object { $ctx.Scopes -notcontains $_ })
+
+        # If a custom app reg is configured, verify the existing context used the same ClientId
+        $hasAll = $false
+        if ($ctx) {
+            $scopesOk  = -not ($scopes | Where-Object { $ctx.Scopes -notcontains $_ })
+            $clientOk  = (-not $appReg) -or ($ctx.ClientId -eq $appReg.ClientId)
+            $hasAll    = $scopesOk -and $clientOk
+        }
         if ($hasAll) { return $true }
-        Connect-MgGraph -Scopes $scopes -NoWelcome -ErrorAction Stop | Out-Null
+
+        if ($appReg) {
+            Write-Status "Connecting with custom app registration (Client ID: $($appReg.ClientId)) ..." -Level Info
+            $connectParams = @{
+                ClientId    = $appReg.ClientId
+                Scopes      = $scopes
+                NoWelcome   = $true
+                ErrorAction = 'Stop'
+            }
+            if ($appReg.TenantId) { $connectParams['TenantId'] = $appReg.TenantId }
+            Connect-MgGraph @connectParams | Out-Null
+        } else {
+            Connect-MgGraph -Scopes $scopes -NoWelcome -ErrorAction Stop | Out-Null
+        }
         return $true
     } catch {
         Write-Status "Authentication failed: $($_.Exception.Message)" -Level Error
@@ -869,4 +975,4 @@ function Invoke-AssignmentFlowOnce {
     }
 }
 
-Export-ModuleMember -Function Start-AccessPackageOnDemand, Set-AccessPackageConfig, Get-AccessPackageConfig, Clear-AccessPackageConfig
+Export-ModuleMember -Function Start-AccessPackageOnDemand, Set-AccessPackageConfig, Get-AccessPackageConfig, Clear-AccessPackageConfig, Get-AppRegistrationConfig, Clear-AppRegistrationConfig

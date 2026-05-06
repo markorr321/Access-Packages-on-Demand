@@ -10,7 +10,9 @@
         'Start-AccessPackageOnDemand',
         'Set-AccessPackageConfig',
         'Get-AccessPackageConfig',
-        'Clear-AccessPackageConfig'
+        'Clear-AccessPackageConfig',
+        'Get-AppRegistrationConfig',
+        'Clear-AppRegistrationConfig'
     )
     CmdletsToExport   = @()
     VariablesToExport = @()
