@@ -123,26 +123,15 @@ function Set-AccessPackageConfig {
             Write-Host "  ${ESC}[33mNo packages configured yet.${ESC}[0m"
             Write-Host ""
         }
-        # Show app registration status
-        $appReg = Get-AppRegistrationConfig
-        if ($appReg) {
-            Write-Host "  ${ESC}[1;97mApp Registration:${ESC}[0m"
-            Write-Host "    ${ESC}[90m·${ESC}[0m Client ID  ${ESC}[90m$($appReg.ClientId)${ESC}[0m"
-            if ($appReg.TenantId) {
-                Write-Host "    ${ESC}[90m·${ESC}[0m Tenant ID  ${ESC}[90m$($appReg.TenantId)${ESC}[0m"
-            }
-            Write-Host ""
-        }
         Write-Host "  ${ESC}[1;97mOptions${ESC}[0m"
         Write-Host "    ${ESC}[36m1${ESC}[0m  Add a package"
         Write-Host "    ${ESC}[36m2${ESC}[0m  Remove a package"
         Write-Host "    ${ESC}[36m3${ESC}[0m  Replace all (start fresh)"
-        Write-Host "    ${ESC}[36m4${ESC}[0m  Configure app registration"
-        Write-Host "    ${ESC}[36m5${ESC}[0m  Done"
+        Write-Host "    ${ESC}[36m4${ESC}[0m  Done"
         Write-Host ""
-        $choice = (Read-Host '  Select option (1-5)').Trim()
-        if ($choice -notmatch '^[1-5]$') { continue }
-        if ($choice -eq '5') { return }
+        $choice = (Read-Host '  Select option (1-4)').Trim()
+        if ($choice -notmatch '^[1-4]$') { continue }
+        if ($choice -eq '4') { return }
 
         switch ($choice) {
             '1' {
@@ -193,31 +182,48 @@ function Set-AccessPackageConfig {
                 }
                 Start-Sleep -Milliseconds 600
             }
-            '4' {
-                Write-Host ""
-                Write-Host "  ${ESC}[1;97mConfigure App Registration${ESC}[0m"
-                Write-Host "  ${ESC}[90m──────────────────────────${ESC}[0m"
-                Write-Host ""
-                Write-Host "  ${ESC}[90mLeave blank and press Enter to clear the saved app registration.${ESC}[0m"
-                Write-Host ""
-                $cid = (Read-Host '  Client ID (GUID)').Trim()
-                if ([string]::IsNullOrWhiteSpace($cid)) {
-                    Clear-AppRegistrationConfig
-                    Start-Sleep -Milliseconds 600
-                    continue
-                }
-                try { $null = [System.Guid]::Parse($cid) }
-                catch { Write-Host "  ${ESC}[31mInvalid GUID format.${ESC}[0m"; Start-Sleep -Milliseconds 800; continue }
-                $tid = (Read-Host '  Tenant ID (GUID, optional)').Trim()
-                if ($tid -and -not ([string]::IsNullOrWhiteSpace($tid))) {
-                    try { $null = [System.Guid]::Parse($tid) }
-                    catch { Write-Host "  ${ESC}[31mInvalid Tenant ID GUID.${ESC}[0m"; Start-Sleep -Milliseconds 800; continue }
-                } else { $tid = '' }
-                Save-AppRegistrationConfig -ClientId $cid -TenantId $tid
-                Write-Host "  ${ESC}[32mApp registration saved.${ESC}[0m"; Start-Sleep -Milliseconds 600
-            }
         }
     }
+}
+
+function Set-AppRegistrationConfig {
+    [CmdletBinding()]
+    param()
+    $ESC = $script:ESC
+    Clear-Host
+    Write-Host ""
+    Write-Host "  ${ESC}[1;97mConfigure App Registration${ESC}[0m"
+    Write-Host "  ${ESC}[90m──────────────────────────${ESC}[0m"
+    Write-Host ""
+    $appReg = Get-AppRegistrationConfig
+    if ($appReg) {
+        Write-Host "  ${ESC}[1;97mCurrently configured:${ESC}[0m"
+        Write-Host "    ${ESC}[90m·${ESC}[0m Client ID  ${ESC}[90m$($appReg.ClientId)${ESC}[0m"
+        if ($appReg.TenantId) {
+            Write-Host "    ${ESC}[90m·${ESC}[0m Tenant ID  ${ESC}[90m$($appReg.TenantId)${ESC}[0m"
+        }
+        Write-Host ""
+    } else {
+        Write-Host "  ${ESC}[33mNo app registration configured — using default Microsoft public client.${ESC}[0m"
+        Write-Host ""
+    }
+    Write-Host "  ${ESC}[90mLeave Client ID blank and press Enter to clear.${ESC}[0m"
+    Write-Host ""
+    $cid = (Read-Host '  Client ID (GUID)').Trim()
+    if ([string]::IsNullOrWhiteSpace($cid)) {
+        Clear-AppRegistrationConfig
+        return
+    }
+    try { $null = [System.Guid]::Parse($cid) }
+    catch { Write-Host "  ${ESC}[31mInvalid Client ID GUID.${ESC}[0m" -ForegroundColor Red; return }
+    $tid = (Read-Host '  Tenant ID (GUID, optional — press Enter to skip)').Trim()
+    if ($tid -and -not ([string]::IsNullOrWhiteSpace($tid))) {
+        try { $null = [System.Guid]::Parse($tid) }
+        catch { Write-Host "  ${ESC}[31mInvalid Tenant ID GUID.${ESC}[0m" -ForegroundColor Red; return }
+    } else { $tid = '' }
+    Save-AppRegistrationConfig -ClientId $cid -TenantId $tid
+    Write-Host ""
+    Write-Host "  ${ESC}[32m[+]${ESC}[0m App registration saved."
 }
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -975,4 +981,4 @@ function Invoke-AssignmentFlowOnce {
     }
 }
 
-Export-ModuleMember -Function Start-AccessPackageOnDemand, Set-AccessPackageConfig, Get-AccessPackageConfig, Clear-AccessPackageConfig, Get-AppRegistrationConfig, Clear-AppRegistrationConfig
+Export-ModuleMember -Function Start-AccessPackageOnDemand, Set-AccessPackageConfig, Get-AccessPackageConfig, Clear-AccessPackageConfig, Set-AppRegistrationConfig, Get-AppRegistrationConfig, Clear-AppRegistrationConfig

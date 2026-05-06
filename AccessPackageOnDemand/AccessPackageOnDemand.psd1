@@ -11,6 +11,7 @@
         'Set-AccessPackageConfig',
         'Get-AccessPackageConfig',
         'Clear-AccessPackageConfig',
+        'Set-AppRegistrationConfig',
         'Get-AppRegistrationConfig',
         'Clear-AppRegistrationConfig'
     )
