@@ -406,6 +406,153 @@ function Select-FromList {
 #  Graph connection (PRIVATE)
 # ═══════════════════════════════════════════════════════════════════════════
 
+# MSAL browser auth state
+$script:MSALAssemblyPaths  = @{}
+$script:MSALHelperCompiled = $false
+
+function Initialize-MSALAssemblies {
+    $userHome = if ($env:USERPROFILE) { $env:USERPROFILE } else { $HOME }
+
+    $msalDll         = $null
+    $abstractionsDll = $null
+
+    $nugetPath = Join-Path $userHome ".nuget/packages/microsoft.identity.client"
+    if (Test-Path $nugetPath) {
+        $latestVersion = Get-ChildItem $nugetPath -Directory | Sort-Object Name -Descending | Select-Object -First 1
+        if ($latestVersion) {
+            $msalDll = Join-Path $latestVersion.FullName "lib/net6.0/Microsoft.Identity.Client.dll"
+            if (-not (Test-Path $msalDll)) {
+                $msalDll = Join-Path $latestVersion.FullName "lib/netstandard2.0/Microsoft.Identity.Client.dll"
+            }
+        }
+        $abstractionsPath = Join-Path $userHome ".nuget/packages/microsoft.identitymodel.abstractions"
+        if (Test-Path $abstractionsPath) {
+            $latestAbs = Get-ChildItem $abstractionsPath -Directory | Sort-Object Name -Descending | Select-Object -First 1
+            if ($latestAbs) {
+                $abstractionsDll = Join-Path $latestAbs.FullName "lib/net6.0/Microsoft.IdentityModel.Abstractions.dll"
+                if (-not (Test-Path $abstractionsDll)) {
+                    $abstractionsDll = Join-Path $latestAbs.FullName "lib/netstandard2.0/Microsoft.IdentityModel.Abstractions.dll"
+                }
+            }
+        }
+    }
+
+    # Fallback: look inside Az.Accounts
+    if (-not $msalDll -or -not (Test-Path $msalDll)) {
+        $azMod = Get-Module -Name Az.Accounts -ListAvailable | Select-Object -First 1
+        if ($azMod) {
+            Import-Module Az.Accounts -ErrorAction SilentlyContinue -Verbose:$false
+            $loaded = [System.AppDomain]::CurrentDomain.GetAssemblies() |
+                Select-Object -ExpandProperty Location -ErrorAction SilentlyContinue
+            $azCommon = $loaded | Where-Object { $_ -match "[/\\]Az.Accounts[/\\]" -and $_ -match "Microsoft.Azure.Common" }
+            if ($azCommon) {
+                $dir = Split-Path -Parent ($azCommon | Select-Object -First 1)
+                $f = Get-ChildItem $dir -Filter "Microsoft.Identity.Client.dll" -Recurse -File -ErrorAction SilentlyContinue | Select-Object -First 1
+                $a = Get-ChildItem $dir -Filter "Microsoft.IdentityModel.Abstractions.dll" -Recurse -File -ErrorAction SilentlyContinue | Select-Object -First 1
+                if ($f) { $msalDll = $f.FullName }
+                if ($a) { $abstractionsDll = $a.FullName }
+            }
+        }
+    }
+
+    if (-not $msalDll -or -not (Test-Path $msalDll)) { return $false }
+
+    $loadedNow = [System.AppDomain]::CurrentDomain.GetAssemblies()
+
+    if ($abstractionsDll -and (Test-Path $abstractionsDll)) {
+        $already = $loadedNow | Where-Object { $_.GetName().Name -eq 'Microsoft.IdentityModel.Abstractions' } | Select-Object -First 1
+        if (-not $already) {
+            try { [void][System.Reflection.Assembly]::LoadFrom($abstractionsDll) } catch { }
+        }
+        $script:MSALAssemblyPaths['Microsoft.IdentityModel.Abstractions'] = if ($already) { $already.Location } else { $abstractionsDll }
+    }
+
+    $already = $loadedNow | Where-Object { $_.GetName().Name -eq 'Microsoft.Identity.Client' } | Select-Object -First 1
+    if (-not $already) {
+        try { [void][System.Reflection.Assembly]::LoadFrom($msalDll) }
+        catch { return $false }
+    }
+    $script:MSALAssemblyPaths['Microsoft.Identity.Client'] = if ($already) { $already.Location } else { $msalDll }
+
+    return $true
+}
+
+function Initialize-MSALHelper {
+    if ($script:MSALHelperCompiled) { return $true }
+
+    $refs = @(
+        $script:MSALAssemblyPaths['Microsoft.IdentityModel.Abstractions'],
+        $script:MSALAssemblyPaths['Microsoft.Identity.Client']
+    ) | Where-Object { $_ }
+
+    if ($refs.Count -lt 1) { throw "Missing required MSAL assemblies" }
+
+    $refs += @("netstandard","System.Linq","System.Threading.Tasks","System.Collections")
+
+    $code = @"
+using System;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Identity.Client;
+
+public class AccessPackageBrowserAuth
+{
+    public static string GetAccessToken(string clientId, string[] scopes, string tenantId = null)
+    {
+        try {
+            var task = Task.Run(async () => await GetTokenAsync(clientId, scopes, tenantId));
+            if (task.Wait(TimeSpan.FromSeconds(180))) return task.Result;
+            throw new TimeoutException("Authentication timed out");
+        } catch (AggregateException ae) {
+            if (ae.InnerException != null) throw ae.InnerException;
+            throw;
+        }
+    }
+
+    private static async Task<string> GetTokenAsync(string clientId, string[] scopes, string tenantId)
+    {
+        var builder = PublicClientApplicationBuilder.Create(clientId)
+            .WithRedirectUri("http://localhost");
+        if (!string.IsNullOrEmpty(tenantId))
+            builder = builder.WithAuthority("https://login.microsoftonline.com/" + tenantId);
+
+        var app = builder.Build();
+        using (var cts = new CancellationTokenSource(TimeSpan.FromSeconds(180))) {
+            var opts = new SystemWebViewOptions {
+                HtmlMessageSuccess = @"<html><head><meta charset='UTF-8'><title>Signed In</title><style>body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:linear-gradient(135deg,#0078d4,#005a9e);}.c{text-align:center;color:#fff;}.ck{font-size:64px;margin-bottom:20px;}h1{font-weight:300;font-size:28px;margin:0 0 10px 0;}p{opacity:.9;}</style></head><body><div class='c'><div class='ck'>&#10003;</div><h1>Authentication Successful</h1><p>You can close this window and return to PowerShell.</p></div></body></html>",
+                HtmlMessageError   = @"<html><head><meta charset='UTF-8'><title>Sign-in Failed</title><style>body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:linear-gradient(135deg,#e74c3c,#c0392b);}.c{text-align:center;color:#fff;}.ck{font-size:64px;margin-bottom:20px;}h1{font-weight:300;font-size:28px;margin:0 0 10px 0;}p{opacity:.9;}</style></head><body><div class='c'><div class='ck'>&#10005;</div><h1>Authentication Failed</h1><p>Please close this window and try again.</p></div></body></html>"
+            };
+            var result = await app.AcquireTokenInteractive(scopes)
+                .WithPrompt(Prompt.SelectAccount)
+                .WithUseEmbeddedWebView(false)
+                .WithSystemWebViewOptions(opts)
+                .ExecuteAsync(cts.Token)
+                .ConfigureAwait(false);
+            return result.AccessToken;
+        }
+    }
+}
+"@
+
+    try { $null = [AccessPackageBrowserAuth]; $script:MSALHelperCompiled = $true; return $true } catch { }
+    Add-Type -ReferencedAssemblies $refs -TypeDefinition $code -Language CSharp -ErrorAction Stop -IgnoreWarnings 3>$null
+    $script:MSALHelperCompiled = $true
+    return $true
+}
+
+function Get-BrowserAccessToken {
+    param([string[]]$Scopes)
+    if (-not $script:MSALHelperCompiled) { $null = Initialize-MSALHelper }
+    $appReg   = Get-AppRegistrationConfig
+    $clientId = if ($appReg -and $appReg.ClientId) { $appReg.ClientId } else { '14d82eec-204b-4c2f-b7e8-296a70dab67e' }
+    $tenantId = if ($appReg -and $appReg.TenantId) { $appReg.TenantId } else { $null }
+    $fullScopes = @($Scopes | ForEach-Object {
+        if ($_ -notlike 'https://*') { "https://graph.microsoft.com/$_" } else { $_ }
+    })
+    return [AccessPackageBrowserAuth]::GetAccessToken($clientId, $fullScopes, $tenantId)
+}
+
 function Assert-GraphModules {
     $required = @(
         'Microsoft.Graph.Authentication',
@@ -433,29 +580,40 @@ function Connect-GraphSession {
     )
     try {
         $appReg = Get-AppRegistrationConfig
-        $ctx = Get-MgContext -ErrorAction SilentlyContinue
+        $ctx    = Get-MgContext -ErrorAction SilentlyContinue
 
-        # If a custom app reg is configured, verify the existing context used the same ClientId
         $hasAll = $false
         if ($ctx) {
-            $scopesOk  = -not ($scopes | Where-Object { $ctx.Scopes -notcontains $_ })
-            $clientOk  = (-not $appReg) -or ($ctx.ClientId -eq $appReg.ClientId)
-            $hasAll    = $scopesOk -and $clientOk
+            $scopesOk = -not ($scopes | Where-Object { $ctx.Scopes -notcontains $_ })
+            $clientOk = (-not $appReg) -or ($ctx.ClientId -eq $appReg.ClientId)
+            $hasAll   = $scopesOk -and $clientOk
         }
         if ($hasAll) { return $true }
 
-        if ($appReg) {
-            Write-Status "Connecting with custom app registration (Client ID: $($appReg.ClientId)) ..." -Level Info
-            $connectParams = @{
-                ClientId    = $appReg.ClientId
-                Scopes      = $scopes
-                NoWelcome   = $true
-                ErrorAction = 'Stop'
+        # Initialise MSAL for browser-based auth (cross-platform — no WAM)
+        $msalReady = Initialize-MSALAssemblies
+        if ($msalReady) { $null = Initialize-MSALHelper }
+
+        if ($msalReady -and $script:MSALHelperCompiled) {
+            if ($appReg -and $appReg.ClientId) {
+                Write-Status "Connecting with custom app registration (Client ID: $($appReg.ClientId)) ..." -Level Info
+            } else {
+                Write-Status "Opening browser for authentication ..." -Level Info
             }
-            if ($appReg.TenantId) { $connectParams['TenantId'] = $appReg.TenantId }
-            Connect-MgGraph @connectParams | Out-Null
+            $token = Get-BrowserAccessToken -Scopes $scopes
+            if (-not $token) { throw "Browser authentication returned no token." }
+            $secureToken = ConvertTo-SecureString $token -AsPlainText -Force
+            Connect-MgGraph -AccessToken $secureToken -NoWelcome -ErrorAction Stop | Out-Null
         } else {
-            Connect-MgGraph -Scopes $scopes -NoWelcome -ErrorAction Stop | Out-Null
+            # Fallback: let Connect-MgGraph handle it (device code / WAM)
+            Write-Status "MSAL not available — falling back to Connect-MgGraph ..." -Level Warning
+            if ($appReg -and $appReg.ClientId) {
+                $p = @{ ClientId = $appReg.ClientId; Scopes = $scopes; NoWelcome = $true; ErrorAction = 'Stop' }
+                if ($appReg.TenantId) { $p['TenantId'] = $appReg.TenantId }
+                Connect-MgGraph @p | Out-Null
+            } else {
+                Connect-MgGraph -Scopes $scopes -NoWelcome -ErrorAction Stop | Out-Null
+            }
         }
         return $true
     } catch {
