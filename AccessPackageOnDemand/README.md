@@ -10,7 +10,7 @@ A PowerShell module for **on-demand assignment** of users to Entra ID Access Pac
 - Assign one user, or many users at once, by email address
 - Pre-configure the access packages this tool is allowed to manage (no need to browse the directory each run)
 - Detects existing assignments and reports them inline (`already has access` / `not found` / `ready to assign`)
-- Pre-built business justification options plus a custom free-text entry
+- Configurable business justification options plus a custom free-text entry
 - Auto-computes assignment end date from the policy's max duration — no date prompts
 - Auto-recovery for stuck "open request" errors: finds the orphaned request, offers to cancel and retry
 - **3-minute cooling-off countdown** after a successful batch — lets assignments propagate before reviewing
@@ -39,6 +39,9 @@ Start-AccessPackageOnDemand
 | `Set-AccessPackageConfig` | Interactive menu to add / remove / replace the configured access packages |
 | `Get-AccessPackageConfig` | List the access packages currently configured |
 | `Clear-AccessPackageConfig` | Delete the saved configuration |
+| `Set-AccessPackageJustificationOptions` | Set the canned business justification options |
+| `Get-AccessPackageJustificationOptions` | Show the effective canned justification options |
+| `Clear-AccessPackageJustificationOptions` | Remove custom options and revert to defaults |
 
 ## Setup
 
@@ -109,16 +112,53 @@ What happens:
 
 ## Business Justification
 
-When assigning users you will be prompted to pick a justification:
+When assigning users you will be prompted to pick a justification. The numbered options come from your saved configuration:
 
 ```
   Business justification (required)
-    1  Intune and Autopilot Enrollments
-    2  Reprocess and Retry - Intune and Autopilot Enrollment
+    1  Project onboarding access
+    2  Temporary incident response access
+    3  Contractor day-1 access
     C  Custom (type your own)
 ```
 
-Select a number for a pre-built option, or `C` to type a free-text reason.
+Select a number for a saved option, or `C` to type any free-text reason.
+
+Set your own canned responses:
+
+```powershell
+Set-AccessPackageJustificationOptions
+```
+
+You will be prompted for each option one at a time. Each prompt shows `(blank to save)` — press Enter on a blank line to finish and save.
+
+You can also pass an array directly:
+
+```powershell
+Set-AccessPackageJustificationOptions -Options @(
+  'Project onboarding access',
+  'Temporary incident response access',
+  'Contractor day-1 access'
+)
+```
+
+View current options:
+
+```powershell
+Get-AccessPackageJustificationOptions
+```
+
+Revert to built-in defaults:
+
+```powershell
+Clear-AccessPackageJustificationOptions
+```
+
+Optional one-off override at run time:
+
+```powershell
+Start-AccessPackageOnDemand -JustificationOptions @('Break/fix support', 'User migration')
+```
 
 ## Configuration File
 
@@ -133,6 +173,10 @@ Shape:
   "Packages": [
     { "DisplayName": "Autopilot Self Service",      "Id": "473b1caa-c098-40cc-9fb4-9293dbd5de0d" },
     { "DisplayName": "Microsoft Intune Enrollment", "Id": "a1b2c3d4-..." }
+  ],
+  "JustificationOptions": [
+    "Project onboarding access",
+    "Temporary incident response access"
   ]
 }
 ```

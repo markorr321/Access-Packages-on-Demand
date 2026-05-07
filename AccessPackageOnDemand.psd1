@@ -10,7 +10,10 @@
         'Start-AccessPackageOnDemand',
         'Set-AccessPackageConfig',
         'Get-AccessPackageConfig',
-        'Clear-AccessPackageConfig'
+        'Clear-AccessPackageConfig',
+        'Set-AccessPackageJustificationOptions',
+        'Get-AccessPackageJustificationOptions',
+        'Clear-AccessPackageJustificationOptions'
     )
     CmdletsToExport   = @()
     VariablesToExport = @()

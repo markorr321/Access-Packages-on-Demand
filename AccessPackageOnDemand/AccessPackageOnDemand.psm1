@@ -14,6 +14,10 @@
 # ─── Script-scope state ──────────────────────────────────────────────────────
 $script:ESC        = [char]0x1B
 $script:ConfigPath = Join-Path $env:LOCALAPPDATA 'AccessPackageOnDemand\config.json'
+$script:DefaultJustificationOptions = @(
+    'Intune and Autopilot Enrollments',
+    'Reprocess and Retry - Intune and Autopilot Enrollment'
+)
 
 # ═══════════════════════════════════════════════════════════════════════════
 #  Config storage  (PUBLIC)
@@ -32,9 +36,26 @@ function Get-AccessPackageConfig {
     }
 }
 
+function Get-AccessPackageJustificationOptions {
+    [CmdletBinding()]
+    param()
+    if (-not (Test-Path $script:ConfigPath)) { return @($script:DefaultJustificationOptions) }
+    try {
+        $cfg = Get-Content $script:ConfigPath -Raw | ConvertFrom-Json
+        $configured = @($cfg.JustificationOptions | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | ForEach-Object { $_.ToString().Trim() })
+        if ($configured.Count -gt 0) {
+            return @($configured | Select-Object -Unique)
+        }
+    } catch { }
+    return @($script:DefaultJustificationOptions)
+}
+
 function Save-AccessPackageConfig {
     [CmdletBinding()]
-    param([array]$Packages)
+    param(
+        [array]$Packages,
+        [string[]]$JustificationOptions
+    )
     $dir = Split-Path $script:ConfigPath -Parent
     if (-not (Test-Path $dir)) { New-Item -Path $dir -ItemType Directory -Force | Out-Null }
     # Preserve any existing AppRegistration block
@@ -44,6 +65,11 @@ function Save-AccessPackageConfig {
     }
     $cfg = @{ Packages = $Packages }
     if ($existing.AppRegistration) { $cfg['AppRegistration'] = $existing.AppRegistration }
+    if ($PSBoundParameters.ContainsKey('JustificationOptions')) {
+        $cfg['JustificationOptions'] = @($JustificationOptions)
+    } elseif ($existing.JustificationOptions) {
+        $cfg['JustificationOptions'] = @($existing.JustificationOptions)
+    }
     $cfg | ConvertTo-Json -Depth 10 | Set-Content $script:ConfigPath -Force
 }
 
@@ -99,6 +125,65 @@ function Clear-AccessPackageConfig {
         Write-Host "Configuration cleared." -ForegroundColor Green
     } else {
         Write-Host "No configuration file found." -ForegroundColor Yellow
+    }
+}
+
+function Set-AccessPackageJustificationOptions {
+    [CmdletBinding()]
+    param(
+        [string[]]$Options
+    )
+
+    if (-not $PSBoundParameters.ContainsKey('Options')) {
+        $ESC = $script:ESC
+        Write-Host ""
+        Write-Host "  ${ESC}[1;97mSet Business Justification Options${ESC}[0m"
+        Write-Host "  ${ESC}[90mEnter one option per line. Press Enter on an empty line when done.${ESC}[0m"
+        Write-Host "  ${ESC}[90mTip: At any 'Option' prompt, submit a blank value to save.${ESC}[0m"
+        Write-Host ""
+
+        $collected = @()
+        $n = 1
+        while ($true) {
+            $line = (Read-Host "  Option $n (blank to save)").Trim()
+            if ([string]::IsNullOrWhiteSpace($line)) { break }
+            $collected += $line
+            $n++
+        }
+        $Options = $collected
+    }
+
+    $normalized = @(
+        $Options |
+        ForEach-Object { $_.ToString().Trim() } |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+        Select-Object -Unique
+    )
+
+    if ($normalized.Count -eq 0) {
+        throw 'At least one non-empty justification option is required.'
+    }
+
+    Save-AccessPackageConfig -Packages (Get-AccessPackageConfig) -JustificationOptions $normalized
+    Write-Host "Saved $($normalized.Count) business justification option(s)." -ForegroundColor Green
+}
+
+function Clear-AccessPackageJustificationOptions {
+    [CmdletBinding()]
+    param()
+
+    if (-not (Test-Path $script:ConfigPath)) {
+        Write-Host "No configuration file found." -ForegroundColor Yellow
+        return
+    }
+
+    try {
+        $existing = Get-Content $script:ConfigPath -Raw | ConvertFrom-Json -AsHashtable
+        $existing.Remove('JustificationOptions') | Out-Null
+        $existing | ConvertTo-Json -Depth 10 | Set-Content $script:ConfigPath -Force
+        Write-Host "Justification options reset to defaults." -ForegroundColor Green
+    } catch {
+        Write-Host "Failed to clear justification options: $($_.Exception.Message)" -ForegroundColor Red
     }
 }
 
@@ -657,14 +742,20 @@ function Format-DurationFriendly {
 
 function Start-AccessPackageOnDemand {
     [CmdletBinding()]
-    param()
+    param(
+        [string[]]$JustificationOptions
+    )
     $ESC = $script:ESC
+    $flowParams = @{}
+    if ($PSBoundParameters.ContainsKey('JustificationOptions')) {
+        $flowParams['JustificationOptions'] = $JustificationOptions
+    }
 
     if (-not (Assert-GraphModules))  { return }
     if (-not (Connect-GraphSession)) { return }
 
     do {
-        Invoke-AssignmentFlowOnce
+        Invoke-AssignmentFlowOnce @flowParams
         Write-Host ""
         Write-Host -NoNewline "  ${ESC}[97mR${ESC}[0m=run again   ${ESC}[97mENTER${ESC}[0m=exit : "
         $next = Read-Host
@@ -673,7 +764,9 @@ function Start-AccessPackageOnDemand {
 
 function Invoke-AssignmentFlowOnce {
     [CmdletBinding()]
-    param()
+    param(
+        [string[]]$JustificationOptions
+    )
     $ESC = $script:ESC
 
     Clear-Host
@@ -780,11 +873,23 @@ function Invoke-AssignmentFlowOnce {
         }
     }
 
-    # Business justification (required) — canned options + custom
+    # Business justification (required) — configurable options + custom
+    $cannedJustifications = @()
+    if ($PSBoundParameters.ContainsKey('JustificationOptions')) {
+        $cannedJustifications = @($JustificationOptions)
+    } else {
+        $cannedJustifications = @(Get-AccessPackageJustificationOptions)
+    }
     $cannedJustifications = @(
-        'Intune and Autopilot Enrollments',
-        'Reprocess and Retry - Intune and Autopilot Enrollment'
+        $cannedJustifications |
+        Where-Object { $_ -and -not [string]::IsNullOrWhiteSpace($_.ToString()) } |
+        ForEach-Object { $_.ToString().Trim() } |
+        Select-Object -Unique
     )
+    if ($cannedJustifications.Count -eq 0) {
+        $cannedJustifications = @($script:DefaultJustificationOptions)
+    }
+
     $justification = $null
     while ([string]::IsNullOrWhiteSpace($justification)) {
         Write-Host ""
@@ -981,4 +1086,4 @@ function Invoke-AssignmentFlowOnce {
     }
 }
 
-Export-ModuleMember -Function Start-AccessPackageOnDemand, Set-AccessPackageConfig, Get-AccessPackageConfig, Clear-AccessPackageConfig, Set-AppRegistrationConfig, Get-AppRegistrationConfig, Clear-AppRegistrationConfig
+Export-ModuleMember -Function Start-AccessPackageOnDemand, Set-AccessPackageConfig, Get-AccessPackageConfig, Clear-AccessPackageConfig, Set-AccessPackageJustificationOptions, Get-AccessPackageJustificationOptions, Clear-AccessPackageJustificationOptions, Set-AppRegistrationConfig, Get-AppRegistrationConfig, Clear-AppRegistrationConfig
