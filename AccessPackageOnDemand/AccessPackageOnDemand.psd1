@@ -7,6 +7,12 @@
     Description       = 'Interactive on-demand assignment of users to Entra ID Access Packages via Microsoft Graph. Includes a configurable business justification picker, stuck-request recovery, assignment cooling-off countdown, and live assignments view.'
     PowerShellVersion = '7.0'
 
+    RequiredModules   = @(
+        @{ ModuleName = 'Microsoft.Graph.Authentication';       ModuleVersion = '2.0.0' }
+        @{ ModuleName = 'Microsoft.Graph.Identity.Governance';  ModuleVersion = '2.0.0' }
+        @{ ModuleName = 'Microsoft.Graph.Users';                ModuleVersion = '2.0.0' }
+    )
+
     FunctionsToExport = @(
         'Start-AccessPackageOnDemand',
         'Set-AccessPackageConfig',
@@ -33,11 +39,6 @@
             ProjectUri               = 'https://github.com/markorr321/Access-Packages-on-Demand'
             LicenseUri               = 'https://github.com/markorr321/Access-Packages-on-Demand/blob/main/AccessPackageOnDemand/LICENSE'
             ReleaseNotes             = 'v1.0.0 — Initial release. Interactive TUI for on-demand Access Package assignment with configurable business justification options, stuck-request recovery, cooling-off countdown, and live assignments view.'
-            ExternalModuleDependencies = @(
-                'Microsoft.Graph.Authentication',
-                'Microsoft.Graph.Identity.Governance',
-                'Microsoft.Graph.Users'
-            )
         }
     }
 }

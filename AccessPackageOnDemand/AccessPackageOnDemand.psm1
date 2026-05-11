@@ -24,6 +24,19 @@ $script:DefaultJustificationOptions = @(
 # ═══════════════════════════════════════════════════════════════════════════
 
 function Get-AccessPackageConfig {
+    <#
+    .SYNOPSIS
+        Returns the list of managed Access Packages saved to the module config.
+    .DESCRIPTION
+        Reads the per-user config file and returns each configured Access Package
+        as an object with DisplayName and Id properties. Returns an empty array
+        if the config does not exist or cannot be parsed.
+    .EXAMPLE
+        Get-AccessPackageConfig
+        Lists every Access Package currently managed by the module.
+    .OUTPUTS
+        System.Object[]
+    #>
     [CmdletBinding()]
     param()
     if (-not (Test-Path $script:ConfigPath)) { return @() }
@@ -37,6 +50,19 @@ function Get-AccessPackageConfig {
 }
 
 function Get-AccessPackageJustificationOptions {
+    <#
+    .SYNOPSIS
+        Returns the configured business justification options shown during assignment.
+    .DESCRIPTION
+        Reads the saved list of justification options the user can pick from when
+        requesting an Access Package. If none are configured, returns the module's
+        built-in default set.
+    .EXAMPLE
+        Get-AccessPackageJustificationOptions
+        Shows the current justification picker entries.
+    .OUTPUTS
+        System.String[]
+    #>
     [CmdletBinding()]
     param()
     if (-not (Test-Path $script:ConfigPath)) { return @($script:DefaultJustificationOptions) }
@@ -74,6 +100,20 @@ function Save-AccessPackageConfig {
 }
 
 function Get-AppRegistrationConfig {
+    <#
+    .SYNOPSIS
+        Returns the custom Entra app registration used for authentication, if one is set.
+    .DESCRIPTION
+        Reads the saved AppRegistration block from the module config. The returned
+        object exposes ClientId and (optionally) TenantId. Returns $null when no
+        custom registration has been configured — in that case the module uses
+        the Microsoft Graph PowerShell default client.
+    .EXAMPLE
+        Get-AppRegistrationConfig
+        Inspects the currently configured client and tenant.
+    .OUTPUTS
+        System.Object or $null
+    #>
     [CmdletBinding()]
     param()
     if (-not (Test-Path $script:ConfigPath)) { return $null }
@@ -101,6 +141,17 @@ function Save-AppRegistrationConfig {
 }
 
 function Clear-AppRegistrationConfig {
+    <#
+    .SYNOPSIS
+        Removes the custom Entra app registration from the module config.
+    .DESCRIPTION
+        Deletes the AppRegistration block from the saved config. On the next
+        sign-in the module will fall back to the default Microsoft Graph
+        PowerShell client. Other config (packages, justifications) is untouched.
+    .EXAMPLE
+        Clear-AppRegistrationConfig
+        Removes the custom client/tenant binding.
+    #>
     [CmdletBinding()]
     param()
     if (-not (Test-Path $script:ConfigPath)) {
@@ -118,6 +169,16 @@ function Clear-AppRegistrationConfig {
 }
 
 function Clear-AccessPackageConfig {
+    <#
+    .SYNOPSIS
+        Deletes the entire module config file.
+    .DESCRIPTION
+        Removes all saved state — managed packages, justification options, and
+        any app registration. The next interactive run will prompt for setup.
+    .EXAMPLE
+        Clear-AccessPackageConfig
+        Wipes the saved config so the next run starts fresh.
+    #>
     [CmdletBinding()]
     param()
     if (Test-Path $script:ConfigPath) {
@@ -129,6 +190,22 @@ function Clear-AccessPackageConfig {
 }
 
 function Set-AccessPackageJustificationOptions {
+    <#
+    .SYNOPSIS
+        Saves the list of business justification options the picker offers.
+    .DESCRIPTION
+        Replaces the configured justification options with the provided list.
+        Run without arguments to enter options interactively (one per line, blank
+        line to save). Each option is trimmed; blanks and duplicates are removed.
+    .PARAMETER Options
+        Array of justification strings. If omitted, the cmdlet prompts.
+    .EXAMPLE
+        Set-AccessPackageJustificationOptions -Options 'Project Phoenix','Quarterly audit','Customer escalation'
+        Replaces the picker entries with the three supplied values.
+    .EXAMPLE
+        Set-AccessPackageJustificationOptions
+        Starts an interactive prompt to collect options one at a time.
+    #>
     [CmdletBinding()]
     param(
         [string[]]$Options
@@ -169,6 +246,17 @@ function Set-AccessPackageJustificationOptions {
 }
 
 function Clear-AccessPackageJustificationOptions {
+    <#
+    .SYNOPSIS
+        Resets the justification picker back to the built-in defaults.
+    .DESCRIPTION
+        Removes the configured justification options. The picker will fall back
+        to the module's default set on the next run. Other config (packages,
+        app registration) is preserved.
+    .EXAMPLE
+        Clear-AccessPackageJustificationOptions
+        Restores the default justification list.
+    #>
     [CmdletBinding()]
     param()
 
@@ -188,6 +276,17 @@ function Clear-AccessPackageJustificationOptions {
 }
 
 function Set-AccessPackageConfig {
+    <#
+    .SYNOPSIS
+        Launches an interactive editor for the managed Access Package list.
+    .DESCRIPTION
+        Opens a menu-driven editor where you can add packages by Object ID +
+        friendly name, remove individual packages, or replace the entire list.
+        Changes are saved to the module config and picked up on the next run.
+    .EXAMPLE
+        Set-AccessPackageConfig
+        Opens the configuration menu.
+    #>
     [CmdletBinding()]
     param()
     $ESC = $script:ESC
@@ -272,6 +371,19 @@ function Set-AccessPackageConfig {
 }
 
 function Set-AppRegistrationConfig {
+    <#
+    .SYNOPSIS
+        Interactively configures the Entra app registration used for sign-in.
+    .DESCRIPTION
+        Prompts for a Client ID and optional Tenant ID, then saves them so the
+        module signs in against your own app registration instead of the
+        default Microsoft Graph PowerShell client. Useful when conditional
+        access policies target a specific app, or when you need tenant-scoped
+        consent. Run Clear-AppRegistrationConfig to revert.
+    .EXAMPLE
+        Set-AppRegistrationConfig
+        Starts the prompt for ClientId / TenantId.
+    #>
     [CmdletBinding()]
     param()
     $ESC = $script:ESC
@@ -321,6 +433,20 @@ function Write-Banner {
     Write-Host ""
     Write-Host "  ${ESC}[1;97m$Title${ESC}[0m"
     Write-Host "  ${ESC}[90m$('─' * $Title.Length)${ESC}[0m"
+    Write-Host ""
+}
+
+function Write-BrandHeader {
+    param(
+        [string]$Product = 'Access Packages On Demand'
+    )
+    $ESC      = $script:ESC
+    $brand    = 'ENTRA ID'
+    $ruleLen  = [Math]::Max($Product.Length, $brand.Length) + 4
+    Write-Host ""
+    Write-Host "  ${ESC}[38;5;105m$brand${ESC}[0m"
+    Write-Host "  ${ESC}[1;97m$Product${ESC}[0m"
+    Write-Host "  ${ESC}[90m$('─' * $ruleLen)${ESC}[0m"
     Write-Host ""
 }
 
@@ -411,33 +537,52 @@ $script:MSALAssemblyPaths  = @{}
 $script:MSALHelperCompiled = $false
 
 function Initialize-MSALAssemblies {
-    $userHome = if ($env:USERPROFILE) { $env:USERPROFILE } else { $HOME }
+    $loadedNow = [System.AppDomain]::CurrentDomain.GetAssemblies()
+    $alreadyMsal = $loadedNow | Where-Object { $_.GetName().Name -eq 'Microsoft.Identity.Client' } | Select-Object -First 1
+    $alreadyAbs  = $loadedNow | Where-Object { $_.GetName().Name -eq 'Microsoft.IdentityModel.Abstractions' } | Select-Object -First 1
 
-    $msalDll         = $null
-    $abstractionsDll = $null
+    $msalDll         = if ($alreadyMsal) { $alreadyMsal.Location } else { $null }
+    $abstractionsDll = if ($alreadyAbs)  { $alreadyAbs.Location  } else { $null }
 
-    $nugetPath = Join-Path $userHome ".nuget/packages/microsoft.identity.client"
-    if (Test-Path $nugetPath) {
-        $latestVersion = Get-ChildItem $nugetPath -Directory | Sort-Object Name -Descending | Select-Object -First 1
-        if ($latestVersion) {
-            $msalDll = Join-Path $latestVersion.FullName "lib/net6.0/Microsoft.Identity.Client.dll"
-            if (-not (Test-Path $msalDll)) {
-                $msalDll = Join-Path $latestVersion.FullName "lib/netstandard2.0/Microsoft.Identity.Client.dll"
-            }
+    # Primary source: Microsoft.Graph.Authentication's bundled MSAL (always available because we require this module).
+    if (-not $msalDll -or -not (Test-Path $msalDll)) {
+        $mgAuth = Get-Module -Name Microsoft.Graph.Authentication -ListAvailable | Sort-Object Version -Descending | Select-Object -First 1
+        if ($mgAuth) {
+            $mgBase = Split-Path $mgAuth.Path -Parent
+            $editionDir = if ($PSVersionTable.PSEdition -eq 'Core') { 'Core' } else { 'Desktop' }
+            $candidate = Join-Path $mgBase "Dependencies/$editionDir/Microsoft.Identity.Client.dll"
+            if (Test-Path $candidate) { $msalDll = $candidate }
+            $candidateAbs = Join-Path $mgBase "Dependencies/$editionDir/Microsoft.IdentityModel.Abstractions.dll"
+            if (Test-Path $candidateAbs) { $abstractionsDll = $candidateAbs }
         }
-        $abstractionsPath = Join-Path $userHome ".nuget/packages/microsoft.identitymodel.abstractions"
-        if (Test-Path $abstractionsPath) {
-            $latestAbs = Get-ChildItem $abstractionsPath -Directory | Sort-Object Name -Descending | Select-Object -First 1
-            if ($latestAbs) {
-                $abstractionsDll = Join-Path $latestAbs.FullName "lib/net6.0/Microsoft.IdentityModel.Abstractions.dll"
-                if (-not (Test-Path $abstractionsDll)) {
-                    $abstractionsDll = Join-Path $latestAbs.FullName "lib/netstandard2.0/Microsoft.IdentityModel.Abstractions.dll"
+    }
+
+    # Fallback: NuGet global packages cache.
+    if (-not $msalDll -or -not (Test-Path $msalDll)) {
+        $userHome = if ($env:USERPROFILE) { $env:USERPROFILE } else { $HOME }
+        $nugetPath = Join-Path $userHome ".nuget/packages/microsoft.identity.client"
+        if (Test-Path $nugetPath) {
+            $latestVersion = Get-ChildItem $nugetPath -Directory | Sort-Object Name -Descending | Select-Object -First 1
+            if ($latestVersion) {
+                $msalDll = Join-Path $latestVersion.FullName "lib/net6.0/Microsoft.Identity.Client.dll"
+                if (-not (Test-Path $msalDll)) {
+                    $msalDll = Join-Path $latestVersion.FullName "lib/netstandard2.0/Microsoft.Identity.Client.dll"
+                }
+            }
+            $abstractionsPath = Join-Path $userHome ".nuget/packages/microsoft.identitymodel.abstractions"
+            if (Test-Path $abstractionsPath) {
+                $latestAbs = Get-ChildItem $abstractionsPath -Directory | Sort-Object Name -Descending | Select-Object -First 1
+                if ($latestAbs) {
+                    $abstractionsDll = Join-Path $latestAbs.FullName "lib/net6.0/Microsoft.IdentityModel.Abstractions.dll"
+                    if (-not (Test-Path $abstractionsDll)) {
+                        $abstractionsDll = Join-Path $latestAbs.FullName "lib/netstandard2.0/Microsoft.IdentityModel.Abstractions.dll"
+                    }
                 }
             }
         }
     }
 
-    # Fallback: look inside Az.Accounts
+    # Last-resort fallback: Az.Accounts.
     if (-not $msalDll -or -not (Test-Path $msalDll)) {
         $azMod = Get-Module -Name Az.Accounts -ListAvailable | Select-Object -First 1
         if ($azMod) {
@@ -457,22 +602,18 @@ function Initialize-MSALAssemblies {
 
     if (-not $msalDll -or -not (Test-Path $msalDll)) { return $false }
 
-    $loadedNow = [System.AppDomain]::CurrentDomain.GetAssemblies()
-
-    if ($abstractionsDll -and (Test-Path $abstractionsDll)) {
-        $already = $loadedNow | Where-Object { $_.GetName().Name -eq 'Microsoft.IdentityModel.Abstractions' } | Select-Object -First 1
-        if (-not $already) {
-            try { [void][System.Reflection.Assembly]::LoadFrom($abstractionsDll) } catch { }
-        }
-        $script:MSALAssemblyPaths['Microsoft.IdentityModel.Abstractions'] = if ($already) { $already.Location } else { $abstractionsDll }
+    if ($abstractionsDll -and (Test-Path $abstractionsDll) -and -not $alreadyAbs) {
+        try { [void][System.Reflection.Assembly]::LoadFrom($abstractionsDll) } catch { }
+    }
+    if ($abstractionsDll) {
+        $script:MSALAssemblyPaths['Microsoft.IdentityModel.Abstractions'] = $abstractionsDll
     }
 
-    $already = $loadedNow | Where-Object { $_.GetName().Name -eq 'Microsoft.Identity.Client' } | Select-Object -First 1
-    if (-not $already) {
+    if (-not $alreadyMsal) {
         try { [void][System.Reflection.Assembly]::LoadFrom($msalDll) }
         catch { return $false }
     }
-    $script:MSALAssemblyPaths['Microsoft.Identity.Client'] = if ($already) { $already.Location } else { $msalDll }
+    $script:MSALAssemblyPaths['Microsoft.Identity.Client'] = $msalDll
 
     return $true
 }
@@ -480,14 +621,14 @@ function Initialize-MSALAssemblies {
 function Initialize-MSALHelper {
     if ($script:MSALHelperCompiled) { return $true }
 
-    $refs = @(
+    $refs = @(@(
         $script:MSALAssemblyPaths['Microsoft.IdentityModel.Abstractions'],
         $script:MSALAssemblyPaths['Microsoft.Identity.Client']
-    ) | Where-Object { $_ }
+    ) | Where-Object { $_ })
 
     if ($refs.Count -lt 1) { throw "Missing required MSAL assemblies" }
 
-    $refs += @("netstandard","System.Linq","System.Threading.Tasks","System.Collections")
+    $refs = @($refs) + @("netstandard","System.Linq","System.Threading.Tasks","System.Collections")
 
     $code = @"
 using System;
@@ -520,8 +661,8 @@ public class AccessPackageBrowserAuth
         var app = builder.Build();
         using (var cts = new CancellationTokenSource(TimeSpan.FromSeconds(180))) {
             var opts = new SystemWebViewOptions {
-                HtmlMessageSuccess = @"<html><head><meta charset='UTF-8'><title>Signed In</title><style>body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:linear-gradient(135deg,#0078d4,#005a9e);}.c{text-align:center;color:#fff;}.ck{font-size:64px;margin-bottom:20px;}h1{font-weight:300;font-size:28px;margin:0 0 10px 0;}p{opacity:.9;}</style></head><body><div class='c'><div class='ck'>&#10003;</div><h1>Authentication Successful</h1><p>You can close this window and return to PowerShell.</p></div></body></html>",
-                HtmlMessageError   = @"<html><head><meta charset='UTF-8'><title>Sign-in Failed</title><style>body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:linear-gradient(135deg,#e74c3c,#c0392b);}.c{text-align:center;color:#fff;}.ck{font-size:64px;margin-bottom:20px;}h1{font-weight:300;font-size:28px;margin:0 0 10px 0;}p{opacity:.9;}</style></head><body><div class='c'><div class='ck'>&#10005;</div><h1>Authentication Failed</h1><p>Please close this window and try again.</p></div></body></html>"
+                HtmlMessageSuccess = @"<html><head><meta charset='UTF-8'><title>Signed In</title><style>body{font-family:'Segoe UI',-apple-system,BlinkMacSystemFont,Roboto,sans-serif;margin:0;background:#3D2A6E;color:#fff;min-height:100vh;}.header{padding:20px 44px;}.logo{display:flex;align-items:center;gap:10px;}.lm{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;width:23px;height:23px;gap:2px;}.lm>div{display:block;}.s1{background:#f25022;}.s2{background:#7fba00;}.s3{background:#00a4ef;}.s4{background:#ffb900;}.lt{font-size:15px;font-weight:600;color:#fff;letter-spacing:.3px;}.container{display:flex;justify-content:center;padding:64px 16px;}.card{background:#fff;width:440px;padding:44px 56px;border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,.35);}.brand{font-size:11px;letter-spacing:2px;color:#5B53C5;font-weight:600;margin-bottom:6px;}.product{font-size:14px;color:#605e5c;margin-bottom:32px;}.icon{font-size:56px;color:#107c10;line-height:1;margin-bottom:20px;text-align:center;}h1{font-weight:600;font-size:24px;margin:0 0 8px 0;color:#1b1b1b;text-align:center;}p{color:#605e5c;margin:0;font-size:14px;text-align:center;}</style></head><body><div class='header'><div class='logo'><div class='lm'><div class='s1'></div><div class='s2'></div><div class='s3'></div><div class='s4'></div></div><div class='lt'>Microsoft</div></div></div><div class='container'><div class='card'><div class='brand'>ENTRA ID</div><div class='product'>Access Packages On Demand</div><div class='icon'>&#10003;</div><h1>Authentication Successful</h1><p>You can close this window and return to PowerShell.</p></div></div></body></html>",
+                HtmlMessageError   = @"<html><head><meta charset='UTF-8'><title>Sign-in Failed</title><style>body{font-family:'Segoe UI',-apple-system,BlinkMacSystemFont,Roboto,sans-serif;margin:0;background:#3D2A6E;color:#fff;min-height:100vh;}.header{padding:20px 44px;}.logo{display:flex;align-items:center;gap:10px;}.lm{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;width:23px;height:23px;gap:2px;}.lm>div{display:block;}.s1{background:#f25022;}.s2{background:#7fba00;}.s3{background:#00a4ef;}.s4{background:#ffb900;}.lt{font-size:15px;font-weight:600;color:#fff;letter-spacing:.3px;}.container{display:flex;justify-content:center;padding:64px 16px;}.card{background:#fff;width:440px;padding:44px 56px;border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,.35);}.brand{font-size:11px;letter-spacing:2px;color:#5B53C5;font-weight:600;margin-bottom:6px;}.product{font-size:14px;color:#605e5c;margin-bottom:32px;}.icon{font-size:56px;color:#a4262c;line-height:1;margin-bottom:20px;text-align:center;}h1{font-weight:600;font-size:24px;margin:0 0 8px 0;color:#1b1b1b;text-align:center;}p{color:#605e5c;margin:0;font-size:14px;text-align:center;}</style></head><body><div class='header'><div class='logo'><div class='lm'><div class='s1'></div><div class='s2'></div><div class='s3'></div><div class='s4'></div></div><div class='lt'>Microsoft</div></div></div><div class='container'><div class='card'><div class='brand'>ENTRA ID</div><div class='product'>Access Packages On Demand</div><div class='icon'>&#10005;</div><h1>Authentication Failed</h1><p>Please close this window and try again.</p></div></div></body></html>"
             };
             var result = await app.AcquireTokenInteractive(scopes)
                 .WithPrompt(Prompt.SelectAccount)
@@ -899,6 +1040,31 @@ function Format-DurationFriendly {
 # ═══════════════════════════════════════════════════════════════════════════
 
 function Start-AccessPackageOnDemand {
+    <#
+    .SYNOPSIS
+        Starts the interactive Access Package assignment flow.
+    .DESCRIPTION
+        Signs in to Microsoft Graph (browser-based via MSAL), lists the managed
+        Access Packages from the saved config, prompts the user to pick one and
+        provide a business justification, submits the assignment request, and
+        polls until the assignment completes or a fixed cooling-off window
+        expires. Stuck requests are detected and cleared automatically. After
+        each assignment the prompt offers to run the flow again.
+
+        Run Set-AccessPackageConfig once first to register the packages this
+        module should manage; Set-AccessPackageJustificationOptions and
+        Set-AppRegistrationConfig are optional.
+    .PARAMETER JustificationOptions
+        One-off list of justification options to show in the picker, overriding
+        whatever is saved via Set-AccessPackageJustificationOptions. Useful for
+        per-invocation tweaks without rewriting the config.
+    .EXAMPLE
+        Start-AccessPackageOnDemand
+        Runs the full sign-in → pick package → justify → submit flow.
+    .EXAMPLE
+        Start-AccessPackageOnDemand -JustificationOptions 'Incident 12345','Quarterly review'
+        Runs the flow but offers only the two supplied justifications.
+    #>
     [CmdletBinding()]
     param(
         [string[]]$JustificationOptions
@@ -908,6 +1074,9 @@ function Start-AccessPackageOnDemand {
     if ($PSBoundParameters.ContainsKey('JustificationOptions')) {
         $flowParams['JustificationOptions'] = $JustificationOptions
     }
+
+    Clear-Host
+    Write-BrandHeader
 
     if (-not (Assert-GraphModules))  { return }
     if (-not (Connect-GraphSession)) { return }
@@ -928,7 +1097,7 @@ function Invoke-AssignmentFlowOnce {
     $ESC = $script:ESC
 
     Clear-Host
-    Write-Banner "Access Package Assignment Manager"
+    Write-BrandHeader
 
     # Step 2: Select Access Package (from configured list)
     $configured = @(Get-AccessPackageConfig)
