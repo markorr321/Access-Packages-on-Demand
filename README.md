@@ -47,6 +47,48 @@ Start-AccessPackageOnDemand
 
 The module is auto-loaded from the gallery install location — no `Import-Module` path needed.
 
+## Walkthrough
+
+### 1. Sign in
+
+Browser-based sign-in against Microsoft Graph.
+
+![Authentication](AccessPackageOnDemand/Screenshots/Step%201%20Authentication.jpg)
+![Microsoft Graph PowerShell](AccessPackageOnDemand/Screenshots/Step%202%20Microsoft%20Graph%20PowerShell.jpg)
+![Sign in](AccessPackageOnDemand/Screenshots/Step%203%20Sign%20In.jpg)
+![Authentication successful](AccessPackageOnDemand/Screenshots/Step%204%20Authentication%20Successfull.jpg)
+
+### 2. Configure the access packages to manage
+
+`Set-AccessPackageConfig` — add each package by its object ID and a friendly name.
+
+![Set-AccessPackageConfig](AccessPackageOnDemand/Screenshots/Step%205%20Set-AccessPackageConfig.jpg)
+![Add a package](AccessPackageOnDemand/Screenshots/Step%206%20Add%20a%20Package.jpg)
+![Capture the object ID](AccessPackageOnDemand/Screenshots/Step%207%20Capture%20ObjectID.jpg)
+![Paste the GUID](AccessPackageOnDemand/Screenshots/Step%208%20Copy%20Paste%20GUID.jpg)
+![Friendly name](AccessPackageOnDemand/Screenshots/Step%209%20Friendly%20Name.jpg)
+![Done](AccessPackageOnDemand/Screenshots/Step%2010%20Done.jpg)
+
+### 3. Configure justification options
+
+`Set-AccessPackageJustificationOptions` — set the canned business justifications the picker offers.
+
+![Set up canned justifications](AccessPackageOnDemand/Screenshots/Step%2011%20Set%20up%20canned%20justification.jpg)
+![Justification reason](AccessPackageOnDemand/Screenshots/Step%2012%20Reason.jpg)
+
+### 4. Assign a user
+
+`Start-AccessPackageOnDemand` — enter emails, pick a justification, confirm, and assign.
+
+![Add user to access package](AccessPackageOnDemand/Screenshots/Step%2013%20Add%20User%20to%20Access%20Package.jpg)
+![Business justification](AccessPackageOnDemand/Screenshots/Step%2014%20Bussiness%20Justification.jpg)
+![Assign this user](AccessPackageOnDemand/Screenshots/Step%2015%20Assign%20this%20user.jpg)
+![Assignment succeeded](AccessPackageOnDemand/Screenshots/Step%2016%20Assignment%20Succeeded.jpg)
+
+The assignment shows as **Delivered** in the Entra portal once Entitlement Management finishes provisioning (see [Known Issues](#known-issues) for timing):
+
+![Assignment delivered in the Entra portal](AccessPackageOnDemand/Screenshots/Step%207%20Assignment%20Delivered.jpg)
+
 ## Cmdlets
 
 | Cmdlet | Description |
@@ -227,6 +269,18 @@ Hit `Y` and the tool cancels the orphaned request, waits 2 seconds, and re-submi
   - `EntitlementManagement.ReadWrite.All` (delegated)
   - `User.Read.All` (delegated)
 - Directory role that can manage access package assignments (e.g. *Identity Governance Administrator*, or the package's assigned *Catalog owner* / *Access Package Manager*).
+
+## Known Issues
+
+### Assignments can take several minutes to reach `active`
+
+Entra ID Entitlement Management processes assignment requests **asynchronously**. Submitting an assignment only queues it — a Microsoft backend job then works it through `submitted → delivering → delivered`. In practice this can take **3–6+ minutes**, and the timing is controlled entirely by the Microsoft service (there is no SLA). Contributing factors:
+
+- **Queue pickup** — the EM processor runs on a polling cycle, so a request can sit before delivery even starts. This is the largest and most variable delay.
+- **Resource provisioning** — during `delivering`, each resource role in the package (group memberships, app roles, SharePoint roles) is provisioned separately. More resources, or a **dynamic** group, means longer.
+- **Approval** — if the package's policy requires approval, the request waits for an approver before it can be delivered.
+
+Because of this, the 3-minute cooling-off countdown / auto-refresh view may open while a user still shows `delivering`. That's expected — press `R` to refresh again a few minutes later, or check the Entra portal. To reduce delivery time, trim the number of resource roles in the package and avoid dynamic groups.
 
 ## Troubleshooting
 
