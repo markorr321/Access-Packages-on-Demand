@@ -171,7 +171,7 @@ Shape:
 ```json
 {
   "Packages": [
-    { "DisplayName": "Autopilot Self Service",      "Id": "473b1caa-c098-40cc-9fb4-9293dbd5de0d" },
+    { "DisplayName": "Autopilot Self Service",      "Id": "00000000-0000-0000-0000-000000000000" },
     { "DisplayName": "Microsoft Intune Enrollment", "Id": "a1b2c3d4-..." }
   ],
   "JustificationOptions": [
@@ -324,7 +324,7 @@ Shape:
 ```json
 {
   "Packages": [
-    { "DisplayName": "Autopilot Self Service",      "Id": "473b1caa-c098-40cc-9fb4-9293dbd5de0d" },
+    { "DisplayName": "Autopilot Self Service",      "Id": "00000000-0000-0000-0000-000000000000" },
     { "DisplayName": "Microsoft Intune Enrollment", "Id": "a1b2c3d4-..." }
   ]
 }
