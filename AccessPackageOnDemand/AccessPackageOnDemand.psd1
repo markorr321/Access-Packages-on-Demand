@@ -1,6 +1,6 @@
 @{
     RootModule        = 'AccessPackageOnDemand.psm1'
-    ModuleVersion     = '1.0.0'
+    ModuleVersion     = '1.0.2'
     GUID              = 'b6bedcdd-d518-4326-a6a6-cdcdc063d80a'
     Author            = 'Mark Orr'
     Copyright         = '(c) 2026 Mark Orr. All rights reserved.'
@@ -38,7 +38,7 @@
             )
             ProjectUri               = 'https://github.com/markorr321/Access-Packages-on-Demand'
             LicenseUri               = 'https://github.com/markorr321/Access-Packages-on-Demand/blob/main/AccessPackageOnDemand/LICENSE'
-            ReleaseNotes             = 'v1.0.0 — Initial release. Interactive TUI for on-demand Access Package assignment with configurable business justification options, stuck-request recovery, cooling-off countdown, and live assignments view.'
+            ReleaseNotes             = 'v1.0.2 — Added a sign-in mode picker for first-time users, Tenant ID configuration for custom app registrations, streamlined justification setup with improved prompting, and enhanced authentication diagnostics. Builds on the interactive TUI for on-demand Access Package assignment with configurable business justification options, stuck-request recovery, cooling-off countdown, and live assignments view.'
         }
     }
 }
