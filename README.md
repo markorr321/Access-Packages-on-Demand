@@ -53,41 +53,41 @@ The module is auto-loaded from the gallery install location — no `Import-Modul
 
 Browser-based sign-in against Microsoft Graph.
 
-![Authentication](AccessPackageOnDemand/Screenshots/Step%201%20Authentication.jpg)
-![Microsoft Graph PowerShell](AccessPackageOnDemand/Screenshots/Step%202%20Microsoft%20Graph%20PowerShell.jpg)
-![Sign in](AccessPackageOnDemand/Screenshots/Step%203%20Sign%20In.jpg)
-![Authentication successful](AccessPackageOnDemand/Screenshots/Step%204%20Authentication%20Successfull.jpg)
+![Authentication](https://raw.githubusercontent.com/markorr321/Access-Packages-on-Demand/main/AccessPackageOnDemand/Screenshots/Step%201%20Authentication.jpg)
+![Microsoft Graph PowerShell](https://raw.githubusercontent.com/markorr321/Access-Packages-on-Demand/main/AccessPackageOnDemand/Screenshots/Step%202%20Microsoft%20Graph%20PowerShell.jpg)
+![Sign in](https://raw.githubusercontent.com/markorr321/Access-Packages-on-Demand/main/AccessPackageOnDemand/Screenshots/Step%203%20Sign%20In.jpg)
+![Authentication successful](https://raw.githubusercontent.com/markorr321/Access-Packages-on-Demand/main/AccessPackageOnDemand/Screenshots/Step%204%20Authentication%20Successful.jpg)
 
 ### 2. Configure the access packages to manage
 
 `Set-AccessPackageConfig` — add each package by its object ID and a friendly name.
 
-![Set-AccessPackageConfig](AccessPackageOnDemand/Screenshots/Step%205%20Set-AccessPackageConfig.jpg)
-![Add a package](AccessPackageOnDemand/Screenshots/Step%206%20Add%20a%20Package.jpg)
-![Capture the object ID](AccessPackageOnDemand/Screenshots/Step%207%20Capture%20ObjectID.jpg)
-![Paste the GUID](AccessPackageOnDemand/Screenshots/Step%208%20Copy%20Paste%20GUID.jpg)
-![Friendly name](AccessPackageOnDemand/Screenshots/Step%209%20Friendly%20Name.jpg)
-![Done](AccessPackageOnDemand/Screenshots/Step%2010%20Done.jpg)
+![Set-AccessPackageConfig](https://raw.githubusercontent.com/markorr321/Access-Packages-on-Demand/main/AccessPackageOnDemand/Screenshots/Step%205%20Set-AccessPackageConfig.jpg)
+![Add a package](https://raw.githubusercontent.com/markorr321/Access-Packages-on-Demand/main/AccessPackageOnDemand/Screenshots/Step%206%20Add%20a%20Package.jpg)
+![Capture the object ID](https://raw.githubusercontent.com/markorr321/Access-Packages-on-Demand/main/AccessPackageOnDemand/Screenshots/Step%207%20Capture%20ObjectID.jpg)
+![Paste the GUID](https://raw.githubusercontent.com/markorr321/Access-Packages-on-Demand/main/AccessPackageOnDemand/Screenshots/Step%208%20Copy%20Paste%20GUID.jpg)
+![Friendly name](https://raw.githubusercontent.com/markorr321/Access-Packages-on-Demand/main/AccessPackageOnDemand/Screenshots/Step%209%20Friendly%20Name.jpg)
+![Done](https://raw.githubusercontent.com/markorr321/Access-Packages-on-Demand/main/AccessPackageOnDemand/Screenshots/Step%2010%20Done.jpg)
 
 ### 3. Configure justification options
 
 `Set-AccessPackageJustificationOptions` — set the canned business justifications the picker offers.
 
-![Set up canned justifications](AccessPackageOnDemand/Screenshots/Step%2011%20Set%20up%20canned%20justification.jpg)
-![Justification reason](AccessPackageOnDemand/Screenshots/Step%2012%20Reason.jpg)
+![Set up canned justifications](https://raw.githubusercontent.com/markorr321/Access-Packages-on-Demand/main/AccessPackageOnDemand/Screenshots/Step%2011%20Set%20up%20canned%20justification.jpg)
+![Justification reason](https://raw.githubusercontent.com/markorr321/Access-Packages-on-Demand/main/AccessPackageOnDemand/Screenshots/Step%2012%20Reason.jpg)
 
 ### 4. Assign a user
 
 `Start-AccessPackageOnDemand` — enter emails, pick a justification, confirm, and assign.
 
-![Add user to access package](AccessPackageOnDemand/Screenshots/Step%2013%20Add%20User%20to%20Access%20Package.jpg)
-![Business justification](AccessPackageOnDemand/Screenshots/Step%2014%20Bussiness%20Justification.jpg)
-![Assign this user](AccessPackageOnDemand/Screenshots/Step%2015%20Assign%20this%20user.jpg)
-![Assignment succeeded](AccessPackageOnDemand/Screenshots/Step%2016%20Assignment%20Succeeded.jpg)
+![Add user to access package](https://raw.githubusercontent.com/markorr321/Access-Packages-on-Demand/main/AccessPackageOnDemand/Screenshots/Step%2013%20Add%20User%20to%20Access%20Package.jpg)
+![Business justification](https://raw.githubusercontent.com/markorr321/Access-Packages-on-Demand/main/AccessPackageOnDemand/Screenshots/Step%2014%20Business%20Justification.jpg)
+![Assign this user](https://raw.githubusercontent.com/markorr321/Access-Packages-on-Demand/main/AccessPackageOnDemand/Screenshots/Step%2015%20Assign%20this%20user.jpg)
+![Assignment succeeded](https://raw.githubusercontent.com/markorr321/Access-Packages-on-Demand/main/AccessPackageOnDemand/Screenshots/Step%2016%20Assignment%20Succeeded.jpg)
 
 The assignment shows as **Delivered** in the Entra portal once Entitlement Management finishes provisioning (see [Known Issues](#known-issues) for timing):
 
-![Assignment delivered in the Entra portal](AccessPackageOnDemand/Screenshots/Step%207%20Assignment%20Delivered.jpg)
+![Assignment delivered in the Entra portal](https://raw.githubusercontent.com/markorr321/Access-Packages-on-Demand/main/AccessPackageOnDemand/Screenshots/Step%207%20Assignment%20Delivered.jpg)
 
 ## Cmdlets
 
