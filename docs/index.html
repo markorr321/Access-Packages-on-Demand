@@ -261,7 +261,7 @@
             background: var(--bg-primary);
             border: 1px solid var(--border);
             border-radius: 8px;
-            padding: 1.2rem 1.5rem;
+            padding: 1.2rem 3.4rem 1.2rem 1.5rem;
             font-family: 'Cascadia Code', 'Fira Code', 'SF Mono', Consolas, monospace;
             font-size: 0.9rem;
             overflow-x: auto;
@@ -272,6 +272,27 @@
         .code-block .comment { color: #6a9955; }
         .code-block .command { color: #dcdcaa; }
         .code-block .string { color: #ce9178; }
+
+        .copy-btn {
+            position: absolute;
+            top: 0.55rem;
+            right: 0.55rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            padding: 0.3rem 0.55rem;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            background: var(--bg-card);
+            color: var(--text-secondary);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-size: 0.72rem;
+            cursor: pointer;
+            transition: background 0.15s, color 0.15s, border-color 0.15s;
+        }
+        .copy-btn:hover { background: var(--bg-card-hover); color: var(--text-primary); border-color: rgba(102, 126, 234, 0.4); }
+        .copy-btn svg { width: 13px; height: 13px; }
+        .copy-btn.copied { color: #4ade80; border-color: rgba(74, 222, 128, 0.4); }
 
         .code-label {
             font-size: 0.8rem;
@@ -483,6 +504,7 @@
                 <div class="code-step">
                     <div class="code-label">Install</div>
                     <div class="code-block">
+                        <button class="copy-btn" onclick="copyCommand(this)" data-copy="Install-Module -Name Access-Package-OnDemand -Repository PSGallery" aria-label="Copy command"></button>
                         <span class="command">Install-Module</span> <span class="string">-Name Access-Package-OnDemand</span> -Repository PSGallery
                     </div>
                 </div>
@@ -490,6 +512,7 @@
                 <div class="code-step">
                     <div class="code-label">Configure the packages to manage</div>
                     <div class="code-block">
+                        <button class="copy-btn" onclick="copyCommand(this)" data-copy="Set-AccessPackageConfig" aria-label="Copy command"></button>
                         <span class="command">Set-AccessPackageConfig</span>
                     </div>
                 </div>
@@ -497,6 +520,7 @@
                 <div class="code-step">
                     <div class="code-label">Run</div>
                     <div class="code-block">
+                        <button class="copy-btn" onclick="copyCommand(this)" data-copy="Start-AccessPackageOnDemand" aria-label="Copy command"></button>
                         <span class="command">Start-AccessPackageOnDemand</span>
                     </div>
                 </div>
@@ -504,6 +528,7 @@
                 <div class="code-step">
                     <div class="code-label">Optional: Custom App Registration</div>
                     <div class="code-block">
+                        <button class="copy-btn" onclick="copyCommand(this)" data-copy="Set-AppRegistrationConfig" aria-label="Copy command"></button>
                         <span class="comment"># Bring your own Entra app (Client ID / Tenant ID)</span><br>
                         <span class="command">Set-AppRegistrationConfig</span>
                     </div>
@@ -577,6 +602,36 @@
     </div>
 
     <script>
+        var COPY_ICON = '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M4 2a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-1v1a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h1V2Zm1 2h4a2 2 0 0 1 2 2v4h1V2H6v2H5Zm4 1H4v8h5V5Z"/></svg><span>Copy</span>';
+        var CHECK_ICON = '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M13.5 3.5 6 11 2.5 7.5 1 9l5 5 9-9-1.5-1.5Z"/></svg><span>Copied</span>';
+
+        // initialise every copy button with the copy icon + label
+        document.querySelectorAll('.copy-btn').forEach(function (b) { b.innerHTML = COPY_ICON; });
+
+        function copyCommand(btn) {
+            var text = btn.getAttribute('data-copy');
+            function done() {
+                btn.classList.add('copied');
+                btn.innerHTML = CHECK_ICON;
+                setTimeout(function () { btn.classList.remove('copied'); btn.innerHTML = COPY_ICON; }, 1800);
+            }
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(done, function () { fallbackCopy(text, done); });
+            } else {
+                fallbackCopy(text, done);
+            }
+        }
+        function fallbackCopy(text, cb) {
+            var ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.focus(); ta.select();
+            try { document.execCommand('copy'); cb(); } catch (e) { /* no-op */ }
+            document.body.removeChild(ta);
+        }
+
         function openLightbox(img) {
             var lb = document.getElementById('lightbox');
             document.getElementById('lightbox-img').src = img.src;
